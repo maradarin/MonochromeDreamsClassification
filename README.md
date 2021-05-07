@@ -8,6 +8,6 @@ Models used (sorted alphabetically):
 - K-nearest neighbors
 - Support Vector Machine
 
-I've provided a folder containing at least 10 evaluations - score results and graphs - of the different type of architechtures implemented for the CNN.
+I've provided a folder containing at least 10 evaluations - score results and graphs - of the different type of architechtures implemented for the CNN, plus a subfolder with activation images for the input and output layer.
 
 The documentation also contains approaches for the remaining two models and several mixed scores - unsatisfying and average.
