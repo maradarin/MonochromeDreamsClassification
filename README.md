@@ -3,7 +3,8 @@
 Classifiers used for the Monochrome-Dreams Kaggle competition.
 
 Models used (sorted alphabetically):
-- Convolutional Neural Network
+- Convolutional Neural Network (most performant model - 94.746% on Kaggle)
+  - Conclusion: adding a BatchNormalization layer would've further improved the score
 - K-nearest neighbors
 - Support Vector Machine
 
