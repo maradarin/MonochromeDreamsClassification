@@ -1,0 +1,186 @@
+import tensorflow as tf
+from sklearn import metrics
+from tensorflow import keras
+from keras.models import Sequential
+from keras.layers import Dense, Flatten, Conv2D, MaxPooling2D, Dropout
+from tensorflow.keras import layers
+from keras.utils import to_categorical
+from keras import backend as K
+import pandas as pd
+from PIL import Image
+import numpy as np
+import seaborn as sns
+from sklearn.metrics import confusion_matrix
+import matplotlib.pyplot as plt
+from tensorflow.python.keras.callbacks import EarlyStopping, ModelCheckpoint
+from tensorflow.python.keras.models import load_model
+
+plt.style.use('fivethirtyeight')
+
+
+tf.random.set_seed(3434)
+f=open("train.txt","r")
+lines=f.readlines()
+train_labels=[]
+train_images_png=[]
+for x in lines:
+    train_images_png.append('train/' + x.split(',')[0])
+    train_labels.append(int(x.split(',')[1]))
+f.close()
+train_labels = np.array(train_labels).astype(np.int64)
+train_images = np.array([np.array(Image.open(fname)) for fname in train_images_png])
+train_images = train_images.reshape(train_images.shape[0], 32, 32, 1)
+train_images = train_images.astype('float32')
+#train_images = [np.array(image).reshape(1024) for image in train_images]
+
+f=open("validation.txt","r")
+lines=f.readlines()
+validation_labels=[]
+validation_images_png=[]
+for x in lines:
+    validation_images_png.append('validation/' + x.split(',')[0])
+    validation_labels.append(int(x.split(',')[1]))
+f.close()
+validation_labels = np.array(validation_labels).astype(np.int64)
+validation_images = np.array([np.array(Image.open(fname)) for fname in validation_images_png])
+validation_images = validation_images.reshape(validation_images.shape[0], 32, 32, 1)
+validation_images = validation_images.astype('float32')
+#validation_images = [np.array(image).reshape(1024) for image in validation_images]
+count_validation_labels = validation_labels
+count_validation_labels = np.array(count_validation_labels)
+for i in range(9):
+    count_validation_labels[i] = np.count_nonzero(count_validation_labels == i)
+
+f=open("test.txt","r")
+lines=f.readlines()
+test_images_png=[]
+id_images = []
+for x in lines:
+    test_image_png = 'test/' + x.split(',')[0]
+    test_image_png = test_image_png[:-1]
+    test_images_png.append(test_image_png)
+
+    id_image = x.split(',')[0]
+    id_image = id_image[:-1]
+    id_images.append(id_image)
+f.close()
+test_images = np.array([np.array(Image.open(fname)) for fname in test_images_png])
+test_images = test_images.reshape(test_images.shape[0], 32, 32, 1)
+test_images = test_images.astype('float32')
+
+train_one_hot = to_categorical(train_labels, 9)
+validation_one_hot = to_categorical(validation_labels, 9)
+
+train_images = train_images / 255
+validation_images = validation_images / 255
+test_images = test_images / 255
+
+model = Sequential()
+
+model.add(Conv2D(32, (5, 5), activation='relu', input_shape=(32, 32, 1), kernel_regularizer=tf.keras.regularizers.l2(0.001)))
+model.add(MaxPooling2D(pool_size=(2, 2)))
+model.add(Conv2D(128, (5, 5), activation='relu', kernel_regularizer=tf.keras.regularizers.l2(0.001)))
+model.add(MaxPooling2D(pool_size=(2, 2)))
+model.add(Flatten())
+
+model.add(Dense(450, activation='relu', kernel_regularizer=tf.keras.regularizers.l2(0.001)))
+model.add(Dropout(0.5))
+model.add(Dense(150, activation='relu', kernel_regularizer=tf.keras.regularizers.l2(0.001)))
+model.add(Dense(9, activation='softmax'))
+
+model.compile(loss='categorical_crossentropy', optimizer='adam', metrics=['accuracy'])
+model.summary()
+es = EarlyStopping(monitor='val_loss', mode='min', verbose=1, patience=10)
+mc = ModelCheckpoint('best_model.h5', monitor='val_loss', mode='min', save_best_only=True)
+
+hist = model.fit(train_images, train_one_hot, batch_size=64, epochs=100, validation_data=(validation_images, validation_one_hot), callbacks=[es, mc])
+
+model = load_model('best_model.h5')
+print(model.evaluate(validation_images, validation_one_hot)[1]) #87.62%
+
+def recall_m(y_true, y_pred):
+    true_positives = K.sum(K.round(K.clip(y_true * y_pred, 0, 1)))
+    possible_positives = K.sum(K.round(K.clip(y_true, 0, 1)))
+    recall = true_positives / (possible_positives + K.epsilon())
+    return recall
+
+def precision_m(y_true, y_pred):
+    true_positives = K.sum(K.round(K.clip(y_true * y_pred, 0, 1)))
+    predicted_positives = K.sum(K.round(K.clip(y_pred, 0, 1)))
+    precision = true_positives / (predicted_positives + K.epsilon())
+    return precision
+
+def f1_m(y_true, y_pred):
+    precision = precision_m(y_true, y_pred)
+    recall = recall_m(y_true, y_pred)
+    return 2*((precision*recall)/(precision+recall+K.epsilon()))
+
+def confusion_matrix_m(y_true, y_pred):
+    num_classes = len(np.unique(y_true))
+
+    return [[np.sum((y_true == row) & (y_pred == column))
+             for column in range(num_classes)
+            ]for row in range(num_classes)]
+
+def true_positive(label, cf_matrix):
+	return cf_matrix[label][label]
+
+def false_positive(label, cf_matrix):
+	sum = 0
+	for i in range(len(cf_matrix)):
+		if i != label:
+			sum += cf_matrix[0][i]
+	return sum
+
+def true_negative(label, cf_matrix):
+	sum = 0
+	for i in range(len(cf_matrix)):
+		for j in range(len(cf_matrix)):
+			if i != label and j != label:
+				sum += cf_matrix[i][j]
+	return sum
+
+def false_negative(label, cf_matrix):
+	sum = 0
+	for i in range(len(cf_matrix)):
+		if i != label:
+			sum += cf_matrix[i][0]
+	return sum
+
+y_prob = model.predict(validation_images)
+validation_preds = y_prob.argmax(axis = -1)
+predictions = model.predict(test_images)
+predictions = predictions.argmax(axis=-1)
+cf_matrix = confusion_matrix(validation_labels, validation_preds)
+print(sum(validation_labels == validation_preds) / 5000)
+predictions = [str(val) for val in predictions]
+my_submission = pd.DataFrame({'id': id_images, 'label': predictions})
+my_submission.to_csv('submission.csv', index=False)
+
+print(recall_m(validation_one_hot, y_prob))
+print(precision_m(validation_one_hot, y_prob))
+print(f1_m(validation_one_hot, y_prob))
+print("___________________________________________")
+for i in range(9):
+    print(str(true_positive(i, cf_matrix)) + " - " + str(false_positive(i, cf_matrix)) + " - " + str(true_negative(i, cf_matrix)) + " - " + str(false_negative(i, cf_matrix)))
+
+print("___________________________________________")
+plt.plot(hist.history['accuracy'])
+plt.plot(hist.history['val_accuracy'])
+plt.title('Model Accuracy')
+plt.ylabel('Accuracy')
+plt.xlabel('Epoch')
+plt.legend(['Train', 'Val'], loc='upper right')
+plt.show()
+
+plt.plot(hist.history['loss'])
+plt.plot(hist.history['val_loss'])
+plt.title('Model Loss')
+plt.ylabel('Loss')
+plt.xlabel('Epoch')
+plt.legend(['Train', 'Val'], loc='upper right')
+plt.show()
+
+fig, ax = plt.subplots(figsize=(10,10))
+sns.heatmap(cf_matrix, linewidths=1, annot=True, ax=ax, fmt='g')
+plt.show()
