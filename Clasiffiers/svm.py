@@ -1,22 +1,13 @@
-import tensorflow as tf
 from sklearn.metrics import accuracy_score
-from sklearn.model_selection import GridSearchCV
 from sklearn.svm import SVC
 from tensorflow import keras
 from keras import layers, models, preprocessing
-from keras.models import Sequential
-from keras.layers import Dense, Flatten, Conv2D, MaxPooling2D, Dropout
-from keras.utils import to_categorical
-import pandas as pd
 from PIL import Image
 import numpy as np
-from tensorflow.python.keras.callbacks import EarlyStopping, ModelCheckpoint
-from tensorflow.python.keras.models import load_model
-import matplotlib.pyplot as plt
 
 def read_data(name):
-    file_name = name + ".txt"
-    folder_name = name + "/"
+    file_name = "data/" + name + ".txt"
+    folder_name = "data/" + name + "/"
     file = open(file_name, "r")
     lines = file.readlines()
     labels = []
