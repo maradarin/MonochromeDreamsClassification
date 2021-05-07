@@ -6,8 +6,8 @@ from PIL import Image
 import imageio
 
 def read_data(name):
-    file_name = name + ".txt"
-    folder_name = name + "/"
+    file_name = "data/" + name + ".txt"
+    folder_name = "data/" + name + "/"
     file = open(file_name, "r")
     lines = file.readlines()
     labels = []
